@@ -203,6 +203,184 @@ const stmt = {
     SET read_at = datetime('now')
     WHERE id = ? AND student_user_id = ?
   `),
+
+    // ====== for admin use ======
+    listUsersAll: db.prepare(`
+        SELECT id, name, email, role, created_at
+        FROM users
+        ORDER BY id ASC
+      `),
+
+    listUsersByRole: db.prepare(`
+        SELECT id, name, email, role, created_at
+        FROM users
+        WHERE role = ?
+        ORDER BY id ASC
+    `),
+
+      updateUserRole: db.prepare(`
+        UPDATE users SET role = ?
+        WHERE id = ?
+    `),
+
+    deleteUserById: db.prepare(`
+        DELETE FROM users
+        WHERE id = ?
+    `),
+
+    // ====== SUBJECTS ======
+    listSubjects: db.prepare(`
+      SELECT id, code, name
+      FROM subjects
+      ORDER BY code
+    `),
+
+    insertSubject: db.prepare(`
+      INSERT INTO subjects(code, name)
+      VALUES (?, ?)
+    `),
+
+    deleteSubjectById: db.prepare(`
+      DELETE FROM subjects WHERE id = ?
+    `),
+
+    // ====== for admin use ======
+    listClassesAdmin: db.prepare(`
+      SELECT
+        c.id,
+        c.section,
+        subj.code AS subjectCode,
+        subj.name AS subjectName,
+        u.name AS lecturerName,
+        u.id AS lecturerUserId,
+        subj.id AS subjectId
+      FROM classes c
+      JOIN subjects subj ON subj.id = c.subject_id
+      JOIN users u ON u.id = c.lecturer_user_id
+      ORDER BY subj.code, c.section
+    `),
+
+    insertClass: db.prepare(`
+      INSERT INTO classes(subject_id, section, lecturer_user_id)
+      VALUES (?, ?, ?)
+    `),
+
+    // ====== for admin use for timetable ======
+    listTimetableByClass: db.prepare(`
+      SELECT
+        id,
+        class_id,
+        date,
+        start_time,
+        end_time,
+        room,
+        room_lat,
+        room_lng,
+        allowed_radius_m
+      FROM timetable
+      WHERE class_id = ?
+      ORDER BY date DESC, start_time DESC
+    `),
+
+    insertTimetable: db.prepare(`
+      INSERT INTO timetable(class_id, date, start_time, end_time, room, room_lat, room_lng, allowed_radius_m)
+      VALUES (?, ?, ?, ?, ?, NULL, NULL, 80)
+    `),
+
+    deleteTimetableById: db.prepare(`
+      DELETE FROM timetable WHERE id = ?
+    `),
+
+    // ====== REPORTS ======
+    getAttendanceReportByClass: db.prepare(`
+      WITH totals AS (
+        SELECT COUNT(DISTINCT s.id) AS total
+        FROM sessions s
+        JOIN timetable t ON t.id = s.timetable_id
+        WHERE t.class_id = ?
+      ),
+      present AS (
+        SELECT a.student_user_id, COUNT(DISTINCT a.session_id) AS present
+        FROM attendance a
+        JOIN sessions s ON s.id = a.session_id
+        JOIN timetable t ON t.id = s.timetable_id
+        WHERE t.class_id = ?
+        GROUP BY a.student_user_id
+      )
+      SELECT
+        st.student_id,
+        u.name,
+        u.id AS student_user_id,
+        COALESCE(p.present, 0) AS attended,
+        totals.total AS total,
+        CASE
+          WHEN totals.total = 0 THEN 0
+          ELSE ROUND(COALESCE(p.present, 0) * 100.0 / totals.total)
+        END AS percent
+      FROM enrollments e
+      JOIN users u ON u.id = e.student_user_id
+      LEFT JOIN students st ON st.user_id = u.id
+      CROSS JOIN totals
+      LEFT JOIN present p ON p.student_user_id = u.id
+      WHERE e.class_id = ?
+      ORDER BY percent ASC, u.name ASC
+    `),
+
+
+    listAvailableClassesForStudent: db.prepare(`
+        SELECT
+          c.id AS classId,
+          subj.code AS subjectCode,
+          subj.name AS subjectName,
+          c.section AS section,
+          u.name AS lecturerName
+        FROM classes c
+        JOIN subjects subj ON subj.id = c.subject_id
+        JOIN users u ON u.id = c.lecturer_user_id
+        ORDER BY subj.code, c.section
+      `),
+
+    listMyEnrollments: db.prepare(`
+        SELECT
+          c.id AS classId,
+          subj.code AS subjectCode,
+          subj.name AS subjectName,
+          c.section AS section,
+          u.name AS lecturerName
+        FROM enrollments e
+        JOIN classes c ON c.id = e.class_id
+        JOIN subjects subj ON subj.id = c.subject_id
+        JOIN users u ON u.id = c.lecturer_user_id
+        WHERE e.student_user_id = ?
+        ORDER BY subj.code, c.section
+    `),
+
+    isEnrolledInClass: db.prepare(`
+        SELECT 1 AS ok
+        FROM enrollments
+        WHERE class_id = ? AND student_user_id = ?
+        LIMIT 1
+    `),
+
+    //student can only enroll ONE section per subject
+    isEnrolledInSameSubject: db.prepare(`
+        SELECT 1 AS ok
+        FROM enrollments e
+        JOIN classes c ON c.id = e.class_id
+        WHERE e.student_user_id = ?
+          AND c.subject_id = (SELECT subject_id FROM classes WHERE id = ?)
+        LIMIT 1
+    `),
+
+    insertEnrollment: db.prepare(`
+        INSERT INTO enrollments(class_id, student_user_id)
+        VALUES (?, ?)
+    `),
+
+    deleteEnrollment: db.prepare(`
+        DELETE FROM enrollments
+        WHERE class_id = ? AND student_user_id = ?
+    `),
 };
 
 //
@@ -268,4 +446,85 @@ export function listNotificationsForStudent(studentUserId) {
 
 export function markNotificationReadForStudent(studentUserId, notificationId) {
   stmt.markNotificationReadForStudent.run(notificationId, studentUserId);
+}
+
+// ====== for manage user admin ======
+export function listUsers(roleOrNull = null) {
+  if (!roleOrNull) return stmt.listUsersAll.all();
+  return stmt.listUsersByRole.all(roleOrNull);
+}
+
+
+export function updateUserRole(userId, newRole) {
+  return stmt.updateUserRole.run(newRole, userId);
+}
+
+export function deleteUserById(userId) {
+  return stmt.deleteUserById.run(userId);
+}
+
+// ====== for manage subjects coordinator ======
+export function listSubjects() {
+  return stmt.listSubjects.all();
+}
+
+export function createSubject(code, name) {
+  return stmt.insertSubject.run(code, name);
+}
+
+export function deleteSubjectById(subjectId) {
+  return stmt.deleteSubjectById.run(subjectId);
+}
+
+// ====== for manage class timetable admin ======
+export function listClassesAdmin() {
+  return stmt.listClassesAdmin.all();
+}
+
+export function createClass({ subjectId, section, lecturerUserId }) {
+  return stmt.insertClass.run(subjectId, section, lecturerUserId);
+}
+
+// ====== for manage class timetable admin ======
+export function listTimetableByClass(classId) {
+  return stmt.listTimetableByClass.all(classId);
+}
+
+export function createTimetable({ classId, date, start_time, end_time, room }) {
+  return stmt.insertTimetable.run(classId, date, start_time, end_time, room);
+}
+
+export function deleteTimetableById(timetableId) {
+  return stmt.deleteTimetableById.run(timetableId);
+}
+
+// ====== REPORTS ======
+export function getAttendanceReportByClass(classId) {
+  // note: same classId passed 3 times due to CTE usage
+  return stmt.getAttendanceReportByClass.all(classId, classId, classId);
+}
+
+// ====== This is for student enrollment function cuh, dont change ======
+export function listAvailableClassesForStudent() {
+  return stmt.listAvailableClassesForStudent.all();
+}
+
+export function listMyEnrollments(studentUserId) {
+  return stmt.listMyEnrollments.all(studentUserId);
+}
+
+export function isEnrolledInClass(classId, studentUserId) {
+  return !!stmt.isEnrolledInClass.get(classId, studentUserId);
+}
+
+export function isEnrolledInSameSubject(studentUserId, classId) {
+  return !!stmt.isEnrolledInSameSubject.get(studentUserId, classId);
+}
+
+export function enrollStudentInClass(studentUserId, classId) {
+  return stmt.insertEnrollment.run(classId, studentUserId);
+}
+
+export function unenrollStudentFromClass(studentUserId, classId) {
+  return stmt.deleteEnrollment.run(classId, studentUserId);
 }

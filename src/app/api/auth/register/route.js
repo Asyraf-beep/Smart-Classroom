@@ -1,22 +1,12 @@
 // src/app/api/auth/register/route.js
 import { db, getUserByEmail, insertUser, insertStudent, ensureSetting, getSetting, setSetting } from "@/lib/db";
 import { hashPassword } from "@/lib/auth";
+import { allocateStudentId } from "@/lib/generateStudentId";
 
 export const runtime = "nodejs";
 
 function jsonError(message, status = 400, details) {
   return Response.json({ error: message, ...(details ? { details } : {}) }, { status });
-}
-
-function allocateStudentId() {
-  ensureSetting("student_id_counter", "1000");
-
-  const current = Number(getSetting("student_id_counter") || 1000);
-  const next = current + 1;
-
-  setSetting("student_id_counter", String(next));
-
-  return `S${String(next).padStart(4, "0")}`;
 }
 
 function createStudentAccount({ name, email, passwordHash }) {

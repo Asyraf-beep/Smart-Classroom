@@ -49,7 +49,7 @@ export default function AppShell({ children, allowedRoles, pageTitle }) {
           {/* Top bar */}
           <div className="mb-6 flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-slate-900">Smart Classroom</h1>
+              <h1 className="text-2xl font-bold text-slate-900">Smart Classroom hehehe</h1>
               <p className="text-sm text-slate-600">
                 Hi, <span className="font-medium text-slate-900">{payload.name}</span> •{" "}
                 <span className="font-medium text-slate-900">{payload.role}</span>

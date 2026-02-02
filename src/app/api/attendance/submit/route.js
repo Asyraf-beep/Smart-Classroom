@@ -19,7 +19,6 @@ export async function POST(req) {
 
     const sessionId = decoded.sessionId;
 
-    // 2) get room coords from *sessions* (lecturer device location when QR generated)
     const room = db
       .prepare(
         `
@@ -28,7 +27,7 @@ export async function POST(req) {
           room_lat AS roomLat,
           room_lng AS roomLng,
           room_accuracy_m AS roomAccuracyM,
-          radius_m AS radiusM
+          tolerance AS tolerance
         FROM sessions
         WHERE id = ?
         `
@@ -64,7 +63,7 @@ export async function POST(req) {
         Number(room.roomLng)
       );
 
-      const radius = Number(room.radiusM || 80);
+      const radius = Number(room.tolerance || 80);
       if (dist == null || dist > radius) {
         return Response.json(
           { error: `Out of range (${Math.round(dist || 0)}m > ${radius}m)` },
@@ -105,9 +104,8 @@ export async function POST(req) {
       sessionId,
       distanceMeters: dist,
       accuracy,
-      // optional debug info:
       roomAccuracyM: room.roomAccuracyM ?? null,
-      radiusM: room.radiusM ?? 80,
+      tolerance: room.tolerance ?? 80,
     });
   } catch (e) {
     console.error("attendance submit error:", e);

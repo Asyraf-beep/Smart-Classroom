@@ -79,7 +79,6 @@ export async function apiFetch(url, options = {}) {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 
-  // If caller passes body as object, we JSON stringify it automatically
   let body = options.body;
   const isPlainObject =
     body &&

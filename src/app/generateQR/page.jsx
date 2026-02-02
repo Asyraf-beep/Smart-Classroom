@@ -49,7 +49,6 @@ function GenerateQR() {
         const data = await apiFetch(`/api/attendance/list?sessionId=${sessionId}`);
         setAttendance(data.rows || []);
       } catch {
-        // ignore polling errors
       }
     }, 2000);
 
@@ -102,7 +101,7 @@ function GenerateQR() {
           roomLat: lat,
           roomLng: lng,
           roomAccuracyM: accuracy,
-          tolerance: 40, // ✅ must match your sessions column: tolerance
+          tolerance: 80,
         },
       });
 
