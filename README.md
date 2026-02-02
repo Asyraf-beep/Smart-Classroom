@@ -23,7 +23,7 @@ NOTE:
 The next.js server is currently running on my laptop
 So if you want to see the web, you need to either :
 1. Use the same wifi as me (impossible)
-2. Register you computer into my tailscale account (IMPOSSIBLE)
+2. Register your computer into my tailscale account (IMPOSSIBLE)
 3. Use tailscale and ill invite your tailscale to my tailscale network.
 
-after that you can access the web using https://https://pavilion15.tail2abcad.ts.net
+after that you can access the web using https://pavilion15.tail2abcad.ts.net
