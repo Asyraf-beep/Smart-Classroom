@@ -4,6 +4,7 @@ export function getMenuByRole(role) {
         { label: "Dashboard", to: "/dashboard" },
         { label: "Notifications", to: "/notifications" },
         { label: "Enroll", to: "/enroll" },
+        { label: "Today's Schedule", to: "/todaySchedule" },
       ];
     }
 
@@ -11,6 +12,7 @@ export function getMenuByRole(role) {
       return [
         { label: "Dashboard", to: "/dashboard" },
         { label: "Generate QR", to: "/generateQR" },
+        { label: "Mark Attendance", to: "/markAttendanceLate" },
       ];
     }
 
@@ -20,6 +22,7 @@ export function getMenuByRole(role) {
           { label: "Manage Users", to: "/manageUser" },
           { label: "Class & Timetable", to: "/manageClassTimetable" },
           { label: "Reports", to: "/adminReport" },
+          { label: "System Settings", to: "/manageSystemSettings" },
        ];
       }
 

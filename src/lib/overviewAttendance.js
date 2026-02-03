@@ -79,8 +79,6 @@ export function getStudentOverview(userId) {
   const overallPct = totalAll > 0 ? Math.round((attendedAll / totalAll) * 1000) / 10 : 0;
 
   return {
-    student,
-    classes,
     attendance: {
       overall: { attended: attendedAll, total: totalAll, percentage: overallPct },
       bySubject,

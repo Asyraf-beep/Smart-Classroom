@@ -381,6 +381,362 @@ const stmt = {
         DELETE FROM enrollments
         WHERE class_id = ? AND student_user_id = ?
     `),
+
+    countStudentEnrollments: db.prepare(`
+      SELECT COUNT(*) AS cnt
+      FROM enrollments
+      WHERE student_user_id = ?
+    `),
+
+    countStudentUnreadNotifications: db.prepare(`
+      SELECT COUNT(*) AS cnt
+      FROM notifications
+      WHERE student_user_id = ? AND read_at IS NULL
+    `),
+
+    countStudentTotalSessions: db.prepare(`
+      SELECT COUNT(DISTINCT s.id) AS cnt
+      FROM sessions s
+      JOIN timetable t ON t.id = s.timetable_id
+      JOIN enrollments e ON e.class_id = t.class_id
+      WHERE e.student_user_id = ?
+    `),
+
+    countStudentPresentSessions: db.prepare(`
+      SELECT COUNT(DISTINCT a.session_id) AS cnt
+      FROM attendance a
+      JOIN sessions s ON s.id = a.session_id
+      JOIN timetable t ON t.id = s.timetable_id
+      JOIN enrollments e ON e.class_id = t.class_id
+      WHERE a.student_user_id = ? AND e.student_user_id = ?
+    `),
+
+    countStudentLowAttendanceClasses: db.prepare(`
+      WITH threshold(val) AS (SELECT ?),
+      totals AS (
+        SELECT t.class_id, COUNT(DISTINCT s.id) AS total
+        FROM sessions s
+        JOIN timetable t ON t.id = s.timetable_id
+        JOIN enrollments e ON e.class_id = t.class_id
+        WHERE e.student_user_id = ?
+        GROUP BY t.class_id
+      ),
+      present AS (
+        SELECT t.class_id, COUNT(DISTINCT a.session_id) AS present
+        FROM attendance a
+        JOIN sessions s ON s.id = a.session_id
+        JOIN timetable t ON t.id = s.timetable_id
+        WHERE a.student_user_id = ?
+        GROUP BY t.class_id
+      )
+      SELECT COUNT(*) AS cnt
+      FROM totals
+      LEFT JOIN present USING(class_id)
+      WHERE totals.total > 0
+        AND (COALESCE(present.present, 0) * 100.0 / totals.total) < (SELECT val FROM threshold)
+    `),
+
+    listStudentRecentAttendance: db.prepare(`
+      SELECT
+        a.checked_in_at AS time,
+        a.status AS status,
+        subj.code AS subjectCode,
+        c.section AS section,
+        t.date AS date,
+        t.start_time AS start_time,
+        t.end_time AS end_time,
+        t.room AS room
+      FROM attendance a
+      JOIN sessions s ON s.id = a.session_id
+      JOIN timetable t ON t.id = s.timetable_id
+      JOIN classes c ON c.id = t.class_id
+      JOIN subjects subj ON subj.id = c.subject_id
+      WHERE a.student_user_id = ?
+      ORDER BY a.checked_in_at DESC
+      LIMIT ?
+    `),
+
+    listStudentRecentNotifications: db.prepare(`
+      SELECT
+        n.created_at AS time,
+        n.title,
+        n.message,
+        subj.code AS subjectCode,
+        c.section AS section
+      FROM notifications n
+      LEFT JOIN classes c ON c.id = n.class_id
+      LEFT JOIN subjects subj ON subj.id = c.subject_id
+      WHERE n.student_user_id = ?
+      ORDER BY n.created_at DESC
+      LIMIT ?
+    `),
+
+    // ===== Dashboard: LECTURER =====
+    countLecturerClasses: db.prepare(`
+      SELECT COUNT(*) AS cnt
+      FROM classes
+      WHERE lecturer_user_id = ?
+    `),
+
+    countLecturerTodayTimetables: db.prepare(`
+      SELECT COUNT(*) AS cnt
+      FROM timetable t
+      JOIN classes c ON c.id = t.class_id
+      WHERE c.lecturer_user_id = ? AND t.date = date('now')
+    `),
+
+    countLecturerActiveSessions: db.prepare(`
+      SELECT COUNT(*) AS cnt
+      FROM sessions s
+      JOIN timetable t ON t.id = s.timetable_id
+      JOIN classes c ON c.id = t.class_id
+      WHERE c.lecturer_user_id = ? AND s.status = 'ACTIVE'
+    `),
+
+    countLecturerTodayCheckins: db.prepare(`
+      SELECT COUNT(*) AS cnt
+      FROM attendance a
+      JOIN sessions s ON s.id = a.session_id
+      JOIN timetable t ON t.id = s.timetable_id
+      JOIN classes c ON c.id = t.class_id
+      WHERE c.lecturer_user_id = ?
+        AND date(a.checked_in_at) = date('now')
+    `),
+
+    listLecturerRecentCheckins: db.prepare(`
+      SELECT
+        a.checked_in_at AS time,
+        st.student_id AS studentId,
+        u.name AS studentName,
+        subj.code AS subjectCode,
+        c.section AS section
+      FROM attendance a
+      JOIN users u ON u.id = a.student_user_id
+      JOIN students st ON st.user_id = u.id
+      JOIN sessions s ON s.id = a.session_id
+      JOIN timetable t ON t.id = s.timetable_id
+      JOIN classes c ON c.id = t.class_id
+      JOIN subjects subj ON subj.id = c.subject_id
+      WHERE c.lecturer_user_id = ?
+      ORDER BY a.checked_in_at DESC
+      LIMIT ?
+    `),
+
+    listLecturerRecentSessions: db.prepare(`
+      SELECT
+        s.started_at AS time,
+        s.status AS status,
+        subj.code AS subjectCode,
+        c.section AS section,
+        t.date AS date,
+        t.start_time AS start_time,
+        t.end_time AS end_time,
+        t.room AS room
+      FROM sessions s
+      JOIN timetable t ON t.id = s.timetable_id
+      JOIN classes c ON c.id = t.class_id
+      JOIN subjects subj ON subj.id = c.subject_id
+      WHERE c.lecturer_user_id = ?
+      ORDER BY s.started_at DESC
+      LIMIT ?
+    `),
+
+    // ===== Dashboard: ADMIN =====
+    countUsersAll: db.prepare(`SELECT COUNT(*) AS cnt FROM users`),
+    countUsersByRole: db.prepare(`SELECT COUNT(*) AS cnt FROM users WHERE role = ?`),
+    countSubjectsAll: db.prepare(`SELECT COUNT(*) AS cnt FROM subjects`),
+    countClassesAll: db.prepare(`SELECT COUNT(*) AS cnt FROM classes`),
+    countActiveSessionsAll: db.prepare(`SELECT COUNT(*) AS cnt FROM sessions WHERE status='ACTIVE'`),
+
+    listRecentUsers: db.prepare(`
+      SELECT created_at AS time, name, email, role
+      FROM users
+      ORDER BY created_at DESC
+      LIMIT ?
+    `),
+
+    listRecentSessionsAll: db.prepare(`
+      SELECT started_at AS time, status, timetable_id
+      FROM sessions
+      ORDER BY started_at DESC
+      LIMIT ?
+    `),
+
+    // ===== Dashboard: COORDINATOR =====
+    countLowAttendanceStudentsAll: db.prepare(`
+      WITH threshold(val) AS (SELECT ?),
+      totals AS (
+        SELECT t.class_id, COUNT(DISTINCT s.id) AS total
+        FROM sessions s
+        JOIN timetable t ON t.id = s.timetable_id
+        GROUP BY t.class_id
+      ),
+      present AS (
+        SELECT a.student_user_id, t.class_id, COUNT(DISTINCT a.session_id) AS present
+        FROM attendance a
+        JOIN sessions s ON s.id = a.session_id
+        JOIN timetable t ON t.id = s.timetable_id
+        GROUP BY a.student_user_id, t.class_id
+      ),
+      perc AS (
+        SELECT
+          e.student_user_id,
+          e.class_id,
+          totals.total,
+          COALESCE(present.present, 0) AS present
+        FROM enrollments e
+        JOIN totals ON totals.class_id = e.class_id
+        LEFT JOIN present ON present.student_user_id = e.student_user_id AND present.class_id = e.class_id
+        WHERE totals.total > 0
+      )
+      SELECT COUNT(DISTINCT student_user_id) AS cnt
+      FROM perc
+      WHERE (present * 100.0 / total) < (SELECT val FROM threshold)
+    `),
+
+    listLowAttendanceCasesAll: db.prepare(`
+      WITH threshold(val) AS (SELECT ?),
+      totals AS (
+        SELECT t.class_id, COUNT(DISTINCT s.id) AS total
+        FROM sessions s
+        JOIN timetable t ON t.id = s.timetable_id
+        GROUP BY t.class_id
+      ),
+      present AS (
+        SELECT a.student_user_id, t.class_id, COUNT(DISTINCT a.session_id) AS present
+        FROM attendance a
+        JOIN sessions s ON s.id = a.session_id
+        JOIN timetable t ON t.id = s.timetable_id
+        GROUP BY a.student_user_id, t.class_id
+      ),
+      perc AS (
+        SELECT
+          e.student_user_id,
+          e.class_id,
+          totals.total,
+          COALESCE(present.present, 0) AS present,
+          (COALESCE(present.present, 0) * 100.0 / totals.total) AS pct
+        FROM enrollments e
+        JOIN totals ON totals.class_id = e.class_id
+        LEFT JOIN present ON present.student_user_id = e.student_user_id AND present.class_id = e.class_id
+        WHERE totals.total > 0
+      )
+      SELECT
+        u.name AS studentName,
+        st.student_id AS studentId,
+        subj.code AS subjectCode,
+        c.section AS section,
+        ROUND(perc.pct) AS pct,
+        datetime('now') AS time
+      FROM perc
+      JOIN users u ON u.id = perc.student_user_id
+      JOIN students st ON st.user_id = u.id
+      JOIN classes c ON c.id = perc.class_id
+      JOIN subjects subj ON subj.id = c.subject_id
+      WHERE perc.pct < (SELECT val FROM threshold)
+      ORDER BY perc.pct ASC
+      LIMIT ?
+    `),
+
+    getLecturerUserIdBySessionId: db.prepare(`
+      SELECT c.lecturer_user_id AS lecturerUserId
+      FROM sessions s
+      JOIN timetable tt ON tt.id = s.timetable_id
+      JOIN classes c ON c.id = tt.class_id
+      WHERE s.id = ?
+    `),
+
+    updateAttendanceStatus: db.prepare(`
+      UPDATE attendance
+      SET status = ?
+      WHERE session_id = ? AND student_user_id = ?
+    `),
+
+    listStudentScheduleByDate: db.prepare(`
+        SELECT
+          t.id AS timetableId,
+          t.date AS date,
+          t.start_time AS startTime,
+          t.end_time AS endTime,
+          t.room AS room,
+
+          c.id AS classId,
+          c.section AS section,
+
+          subj.code AS subjectCode,
+          subj.name AS subjectName,
+
+          lu.name AS lecturerName
+        FROM enrollments e
+        JOIN classes c ON c.id = e.class_id
+        JOIN timetable t ON t.class_id = c.id
+        JOIN subjects subj ON subj.id = c.subject_id
+        JOIN users lu ON lu.id = c.lecturer_user_id
+        WHERE e.student_user_id = ?
+          AND t.date = ?
+        ORDER BY t.start_time ASC
+    `),
+
+    // ✅ lecturer sessions list (for dropdown)
+    listSessionsForLecturer: db.prepare(`
+      SELECT
+        s.id AS sessionId,
+        s.status AS sessionStatus,
+        s.started_at,
+        t.date,
+        t.start_time,
+        t.end_time,
+        t.room,
+        subj.code AS subjectCode,
+        subj.name AS subjectName,
+        c.section
+      FROM sessions s
+      JOIN timetable t ON t.id = s.timetable_id
+      JOIN classes c ON c.id = t.class_id
+      JOIN subjects subj ON subj.id = c.subject_id
+      WHERE c.lecturer_user_id = ?
+      ORDER BY s.started_at DESC
+      LIMIT 30
+    `),
+
+    // ✅ ownership check (lecturer can only mark their own sessions)
+    lecturerOwnsSession: db.prepare(`
+      SELECT 1 AS ok
+      FROM sessions s
+      JOIN timetable t ON t.id = s.timetable_id
+      JOIN classes c ON c.id = t.class_id
+      WHERE s.id = ? AND c.lecturer_user_id = ?
+      LIMIT 1
+    `),
+
+    //  list attendance rows for a session (only if lecturer owns it)
+    listAttendanceForSessionAsLecturer: db.prepare(`
+      SELECT
+        st.student_id,
+        u.name,
+        a.checked_in_at,
+        a.status
+      FROM attendance a
+      JOIN users u ON u.id = a.student_user_id
+      JOIN students st ON st.user_id = u.id
+
+      JOIN sessions s ON s.id = a.session_id
+      JOIN timetable t ON t.id = s.timetable_id
+      JOIN classes c ON c.id = t.class_id
+
+      WHERE a.session_id = ? AND c.lecturer_user_id = ?
+      ORDER BY a.checked_in_at ASC
+    `),
+
+    // update attendance.status by student_id
+    updateAttendanceStatusByStudentId: db.prepare(`
+      UPDATE attendance
+      SET status = ?
+      WHERE session_id = ?
+        AND student_user_id = (
+          SELECT user_id FROM students WHERE student_id = ?
+        )
+    `)
 };
 
 //
@@ -527,4 +883,171 @@ export function enrollStudentInClass(studentUserId, classId) {
 
 export function unenrollStudentFromClass(studentUserId, classId) {
   return stmt.deleteEnrollment.run(classId, studentUserId);
+}
+
+export function getStudentDashboardSummary(studentUserId) {
+  const threshold = getAttendanceThreshold();
+
+  const enrolled = Number(stmt.countStudentEnrollments.get(studentUserId)?.cnt || 0);
+  const unread = Number(stmt.countStudentUnreadNotifications.get(studentUserId)?.cnt || 0);
+  const total = Number(stmt.countStudentTotalSessions.get(studentUserId)?.cnt || 0);
+  const present = Number(stmt.countStudentPresentSessions.get(studentUserId, studentUserId)?.cnt || 0);
+  const overallPct = total > 0 ? Math.round((present / total) * 100) : 0;
+
+  const low = Number(
+    stmt.countStudentLowAttendanceClasses.get(threshold, studentUserId, studentUserId)?.cnt || 0
+  );
+
+  const tiles = [
+    { label: "Enrolled classes", value: enrolled },
+    { label: "Overall attendance", value: `${overallPct}%`, sub: `${present}/${total} sessions` },
+    { label: "Low attendance classes", value: low, sub: `below ${threshold}%` },
+    { label: "Unread notifications", value: unread },
+  ];
+
+  const notifs = stmt.listStudentRecentNotifications
+    .all(studentUserId, 5)
+    .map((n) => ({
+      type: "notification",
+      title: n.title,
+      subtitle: n.subjectCode ? `${n.subjectCode} (${n.section || "-"}) • ${n.message}` : n.message,
+      time: n.time,
+    }));
+
+  const checkins = stmt.listStudentRecentAttendance
+    .all(studentUserId, 5)
+    .map((a) => ({
+      type: "checkin",
+      title: `Checked in • ${a.subjectCode} (${a.section})`,
+      subtitle: `${a.date} ${a.start_time}-${a.end_time} @ ${a.room} • Status: ${a.status}`,
+      time: a.time,
+    }));
+
+  const activity = [...notifs, ...checkins].sort((x, y) => String(y.time).localeCompare(String(x.time))).slice(0, 10);
+
+  return { tiles, activity };
+}
+
+export function getLecturerDashboardSummary(lecturerUserId) {
+  const classes = Number(stmt.countLecturerClasses.get(lecturerUserId)?.cnt || 0);
+  const todayTT = Number(stmt.countLecturerTodayTimetables.get(lecturerUserId)?.cnt || 0);
+  const active = Number(stmt.countLecturerActiveSessions.get(lecturerUserId)?.cnt || 0);
+  const checkinsToday = Number(stmt.countLecturerTodayCheckins.get(lecturerUserId)?.cnt || 0);
+
+  const tiles = [
+    { label: "My classes", value: classes },
+    { label: "Today's timetables", value: todayTT },
+    { label: "Active sessions", value: active },
+    { label: "Today's check-ins", value: checkinsToday },
+  ];
+
+  const sessions = stmt.listLecturerRecentSessions
+    .all(lecturerUserId, 5)
+    .map((s) => ({
+      type: "session",
+      title: `Session ${s.status} • ${s.subjectCode} (${s.section})`,
+      subtitle: `${s.date} ${s.start_time}-${s.end_time} @ ${s.room}`,
+      time: s.time,
+    }));
+
+  const checkins = stmt.listLecturerRecentCheckins
+    .all(lecturerUserId, 5)
+    .map((c) => ({
+      type: "checkin",
+      title: `Check-in • ${c.studentId} - ${c.studentName}`,
+      subtitle: `${c.subjectCode} (${c.section})`,
+      time: c.time,
+    }));
+
+  const activity = [...sessions, ...checkins].sort((x, y) => String(y.time).localeCompare(String(x.time)));
+
+  return { tiles, activity };
+}
+
+export function getAdminDashboardSummary() {
+  const totalUsers = Number(stmt.countUsersAll.get()?.cnt || 0);
+  const students = Number(stmt.countUsersByRole.get("STUDENT")?.cnt || 0);
+  const lecturers = Number(stmt.countUsersByRole.get("LECTURER")?.cnt || 0);
+  const subjects = Number(stmt.countSubjectsAll.get()?.cnt || 0);
+  const classes = Number(stmt.countClassesAll.get()?.cnt || 0);
+  const activeSessions = Number(stmt.countActiveSessionsAll.get()?.cnt || 0);
+
+  const tiles = [
+    { label: "Total users", value: totalUsers },
+    { label: "Students", value: students },
+    { label: "Lecturers", value: lecturers },
+    { label: "Subjects", value: subjects },
+    { label: "Classes", value: classes },
+    { label: "Active sessions", value: activeSessions },
+  ];
+
+  const recentUsers = stmt.listRecentUsers.all(8).map((u) => ({
+    type: "user",
+    title: `New user • ${u.name} (${u.role})`,
+    subtitle: u.email,
+    time: u.time,
+  }));
+
+  const recentSessions = stmt.listRecentSessionsAll.all(5).map((s) => ({
+    type: "session",
+    title: `Session ${s.status}`,
+    subtitle: `timetable_id: ${s.timetable_id}`,
+    time: s.time,
+  }));
+
+  const activity = [...recentUsers, ...recentSessions].sort((x, y) => String(y.time).localeCompare(String(x.time)));
+
+  return { tiles, activity };
+}
+
+export function getCoordinatorDashboardSummary() {
+  const threshold = getAttendanceThreshold();
+  const subjects = Number(stmt.countSubjectsAll.get()?.cnt || 0);
+  const classes = Number(stmt.countClassesAll.get()?.cnt || 0);
+
+  const lowStudents = Number(stmt.countLowAttendanceStudentsAll.get(threshold)?.cnt || 0);
+
+  const tiles = [
+    { label: "Subjects", value: subjects },
+    { label: "Classes", value: classes },
+    { label: "Low-attendance students", value: lowStudents, sub: `below ${threshold}% in any class` },
+  ];
+
+  const cases = stmt.listLowAttendanceCasesAll.all(threshold, 10).map((r) => ({
+    type: "low",
+    title: `Low attendance • ${r.studentId} - ${r.studentName}`,
+    subtitle: `${r.subjectCode} (${r.section}) • ${r.pct}%`,
+    time: r.time,
+  }));
+
+  return { tiles, activity: cases };
+}
+
+export function getLecturerUserIdBySessionId(sessionId) {
+  return stmt.getLecturerUserIdBySessionId.get(sessionId)?.lecturerUserId ?? null;
+}
+
+export function updateAttendanceStatus(sessionId, studentUserId, status) {
+  return stmt.updateAttendanceStatus.run(status, sessionId, studentUserId);
+}
+
+export function listStudentScheduleByDate(studentUserId, dateYYYYMMDD) {
+  return stmt.listStudentScheduleByDate.all(studentUserId, dateYYYYMMDD);
+}
+
+export function listSessionsForLecturer(lecturerUserId) {
+  return stmt.listSessionsForLecturer.all(lecturerUserId);
+}
+
+export function lecturerOwnsSession(sessionId, lecturerUserId) {
+  const row = stmt.lecturerOwnsSession.get(sessionId, lecturerUserId);
+  return !!row;
+}
+
+export function listAttendanceForSessionAsLecturer(sessionId, lecturerUserId) {
+  return stmt.listAttendanceForSessionAsLecturer.all(sessionId, lecturerUserId);
+}
+
+export function updateAttendanceStatusByStudentId({ sessionId, studentId, status }) {
+  return stmt.updateAttendanceStatusByStudentId.run(status, sessionId, studentId);
 }
