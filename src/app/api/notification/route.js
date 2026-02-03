@@ -20,9 +20,6 @@ function jsonError(message, status = 400, details) {
   );
 }
 
-/**
- * Create low-attendance warnings (once per day per class)
- */
 function maybeCreateLowAttendance(studentUserId) {
   const threshold = getAttendanceThreshold(); // e.g. from settings, default 80
   const classes = listStudentEnrolledClasses(studentUserId);

@@ -95,6 +95,10 @@ function DashboardContent() {
           <InfoCard
             title={`${me.role} Info`}
             rows={[
+              { label: "User ID", value: me.id ?? "—" },
+              ...(me.role === "STUDENT"
+                ? [{ label: "Student ID", value: me.studentId ?? "—" }]
+                : []),
               { label: "Name", value: me.name },
               { label: "Email", value: me.email },
               { label: "Role", value: me.role },

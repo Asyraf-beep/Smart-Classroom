@@ -3,6 +3,8 @@
 import { useState } from "react";
 import AppShell from "@/components/AppShell";
 import { apiFetch } from "@/lib/client";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 function AdminReportContent() {
   const [classId, setClassId] = useState("");
@@ -21,8 +23,36 @@ function AdminReportContent() {
   }
 
   function exportPdf(type) {
-    const url = `/api/reports/exportPDF?type=${type}&classId=${encodeURIComponent(classId)}`;
-    window.open(url, "_blank");
+    // const url = `/api/reports/exportPDF?type=${type}&classId=${encodeURIComponent(classId)}`;
+    // window.open(url, "_blank");
+        if (rows.length === 0) {
+      setMsg("⚠️ Please generate the report first.");
+      return;
+    }
+
+    const doc = new jsPDF();
+    doc.text("Attendance Report", 14, 10);
+    doc.text(`Class: ${classId} (${type === "low" ? "Low Attendance" : "Overall"})`, 14, 18);
+
+    let data = rows;
+    if (type === "low") {
+      // Filter < 80% (assuming percent is string "85%" or number)
+      data = rows.filter((r) => parseFloat(r.percent) < 80);
+    }
+
+    if (data.length === 0) {
+      setMsg("⚠️ No data matches criteria.");
+      return;
+    }
+
+    autoTable(doc, {
+      startY: 25,
+      head: [["Student ID", "Name", "%", "Status"]],
+      body: data.map((r) => [r.student_id, r.name, r.percent, r.status]),
+    });
+
+    doc.save(`report_${classId}_${type}.pdf`);
+    setMsg("✅ PDF exported");
   }
 
   return (
@@ -60,7 +90,7 @@ function AdminReportContent() {
             onClick={() => exportPdf("overall")}
             className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100 disabled:opacity-60"
           >
-            Export PDF (Overall) (Under Construction)
+            Export PDF (Overall)
           </button>
 
           <button
@@ -68,7 +98,7 @@ function AdminReportContent() {
             onClick={() => exportPdf("low")}
             className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100 disabled:opacity-60"
           >
-            Export PDF (Low) (Under Construction)
+            Export PDF (Low)
           </button>
         </div>
       </div>

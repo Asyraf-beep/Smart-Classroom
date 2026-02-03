@@ -736,7 +736,21 @@ const stmt = {
         AND student_user_id = (
           SELECT user_id FROM students WHERE student_id = ?
         )
-    `)
+    `),
+
+    getUserWithStudentIdById: db.prepare(`
+      SELECT
+        u.id,
+        u.name,
+        u.email,
+        u.role,
+        u.created_at,
+        s.student_id AS studentId
+      FROM users u
+      LEFT JOIN students s ON s.user_id = u.id
+      WHERE u.id = ?
+    `),
+
 };
 
 //
@@ -1050,4 +1064,8 @@ export function listAttendanceForSessionAsLecturer(sessionId, lecturerUserId) {
 
 export function updateAttendanceStatusByStudentId({ sessionId, studentId, status }) {
   return stmt.updateAttendanceStatusByStudentId.run(status, sessionId, studentId);
+}
+
+export function getUserWithStudentIdById(id) {
+  return stmt.getUserWithStudentIdById.get(id);
 }

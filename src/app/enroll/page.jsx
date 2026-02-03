@@ -250,7 +250,7 @@ function EnrollContent() {
       </div>
 
       <div className="text-xs text-slate-500">
-        Note: You enroll into a <b>class/section</b> (not directly into a subject).
+        Note: You can only enroll one class per subject.
       </div>
     </div>
   );
