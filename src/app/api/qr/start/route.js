@@ -77,7 +77,7 @@ export async function POST(req) {
 
   // short-lived token (you can refresh QR without creating new session)
   const token = jwt.sign({ sessionId }, process.env.JWT_SECRET, { expiresIn: "10m" });
-  const link = `${process.env.BASE_URL}/checkin?token=${encodeURIComponent(token)}`;
+  const link = `${process.env.BASE_URL}/AttendanceSubmission?token=${encodeURIComponent(token)}`;
 
   const qrDataUrl = await QRCode.toDataURL(link);
   return Response.json({ sessionId, link, qrDataUrl });

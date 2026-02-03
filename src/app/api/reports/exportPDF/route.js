@@ -11,15 +11,11 @@ export async function GET(req) {
   const type = url.searchParams.get("type") || "overall";
   const classId = url.searchParams.get("classId");
 
-  // call internal APIs via fetch is annoying on server; keep it simple:
-  // just redirect user to JSON route if missing classId
   if (!classId) {
     return Response.json({ error: "Missing classId" }, { status: 400 });
   }
 
-  // Build rows by calling the same report routes using absolute fetch is possible,
-  // but easier: client already loaded JSON and could do PDF client-side.
-  // For assignment, we do server-side by fetching JSON from same origin:
+
   const base = `${url.protocol}//${url.host}`;
   const jsonUrl = type === "low"
     ? `${base}/api/reports/lowAttendance?classId=${classId}`

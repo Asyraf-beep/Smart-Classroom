@@ -50,8 +50,8 @@ export function initDB() {
       start_time TEXT NOT NULL,      -- HH:MM
       end_time TEXT NOT NULL,        -- HH:MM
       room TEXT NOT NULL,
-      room_lat REAL,                 -- optional
-      room_lng REAL,                 -- optional
+      room_lat REAL,
+      room_lng REAL,
       allowed_radius_m INTEGER NOT NULL DEFAULT 80,
       FOREIGN KEY(class_id) REFERENCES classes(id) ON DELETE CASCADE
     );
