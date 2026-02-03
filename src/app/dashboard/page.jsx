@@ -63,7 +63,7 @@ function DashboardContent() {
     })();
   }, [payload]);
 
-  // ✅ Load /api/student/overview only for STUDENT
+  // Load /api/student/overview only for STUDENT
   useEffect(() => {
     if (!payload) return;
     if (role !== "STUDENT") return;

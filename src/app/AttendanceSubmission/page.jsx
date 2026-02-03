@@ -24,7 +24,6 @@ export default function CheckinPage() {
 
   useEffect(() => {
     requestLocation();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function requestLocation() {
