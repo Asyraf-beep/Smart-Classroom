@@ -7,7 +7,7 @@ import { apiFetch, saveAuth } from "@/lib/client";
 export default function LoginPage() {
   const router = useRouter();
 
-  const [email, setEmail] = useState("example@student.com");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);

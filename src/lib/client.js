@@ -15,7 +15,6 @@ export function saveAuth({ token, role, name }) {
 }
 
 export function saveToken(token) {
-  // keep for backward compatibility
   if (token) localStorage.setItem(TOKEN_KEY, token);
 }
 
